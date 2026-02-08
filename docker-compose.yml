@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  # =============================================
+  # OpenCode Server — runs the AI coding agent
+  # =============================================
+  opencode-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: opencode-server
+    ports:
+      - "4096:4096"
+    environment:
+      - OPENCODE_PORT=4096
+      - OPENCODE_HOST=0.0.0.0
+      # Set a password for production use
+      - OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD:-}
+    volumes:
+      # Mount your local OpenCode auth config (after running `opencode auth login` locally)
+      - ${HOME}/.config/opencode:/root/.config/opencode:ro
+      # Optional: mount your project directory for the agent to work on
+      # - ./my-project:/workspace
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4096/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # =============================================
+  # Chatbot UI — custom web interface
+  # =============================================
+  chatbot-ui:
+    build:
+      context: ./chatbot-ui
+      dockerfile: Dockerfile
+    container_name: opencode-chatbot-ui
+    ports:
+      - "3000:3000"
+    environment:
+      - OPENCODE_SERVER_URL=http://opencode-server:4096
+      - PORT=3000
+    depends_on:
+      opencode-server:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  default:
+    name: opencode-network

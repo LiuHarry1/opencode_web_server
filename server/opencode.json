@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/schema.json",
+  "agent": {
+    "coding-assistant": {
+      "instructions": "./agents/coding-assistant.md"
+    },
+    "code-reviewer": {
+      "instructions": "./agents/code-reviewer.md"
+    }
+  },
+  "mcp": {},
+  "theme": "catppuccin-mocha"
+}
