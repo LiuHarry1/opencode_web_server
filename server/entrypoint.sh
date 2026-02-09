@@ -39,14 +39,28 @@ else
 fi
 
 # -----------------------------------------------
-# 3. Check custom agents
+# 3. Restore skills (volume mount may overwrite global config)
 # -----------------------------------------------
-AGENTS_DIR="/app/agents"
-if [ -d "$AGENTS_DIR" ] && [ "$(ls -A $AGENTS_DIR 2>/dev/null)" ]; then
-    AGENT_COUNT=$(ls -1 "$AGENTS_DIR"/*.md 2>/dev/null | wc -l)
-    echo "[✓] Found $AGENT_COUNT custom agent(s) in /app/agents/"
+SKILLS_BACKUP="/opt/opencode-skills"
+GLOBAL_SKILLS="$HOME/.config/opencode/skills"
+
+if [ -d "$SKILLS_BACKUP" ] && [ "$(ls -A $SKILLS_BACKUP 2>/dev/null)" ]; then
+    # Copy skills to global config (volume mount may have overwritten them)
+    if mkdir -p "$GLOBAL_SKILLS" 2>/dev/null; then
+        cp -r "$SKILLS_BACKUP"/* "$GLOBAL_SKILLS/" 2>/dev/null || true
+        echo "[✓] Skills copied to global config"
+    else
+        echo "[i] Global config is read-only, using project-level skills only"
+    fi
+
+    SKILL_COUNT=$(find "$SKILLS_BACKUP" -name "SKILL.md" | wc -l)
+    echo "[✓] Found $SKILL_COUNT custom skill(s):"
+    for skill in "$SKILLS_BACKUP"/*/SKILL.md; do
+        name=$(basename "$(dirname "$skill")")
+        echo "    - $name"
+    done
 else
-    echo "[i] No custom agents found in /app/agents/"
+    echo "[i] No custom skills found"
 fi
 
 # -----------------------------------------------

@@ -1,7 +1,7 @@
 {
   "name": "opencode-chatbot-ui",
   "version": "1.0.0",
-  "description": "A modern chatbot UI powered by OpenCode Server SDK",
+  "description": "A modern chatbot UI powered by OpenCode Server API",
   "main": "server.js",
   "type": "module",
   "scripts": {
@@ -9,10 +9,8 @@
     "dev": "node --watch server.js"
   },
   "dependencies": {
-    "@opencode-ai/sdk": "latest",
     "express": "^4.21.0",
     "dotenv": "^16.4.0",
-    "marked": "^15.0.0",
-    "dompurify": "^3.2.0"
+    "eventsource": "^3.0.0"
   }
 }

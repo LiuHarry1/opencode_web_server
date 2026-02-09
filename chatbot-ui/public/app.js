@@ -247,26 +247,15 @@ class OpenCodeChatbot {
   // Event Text Extraction
   // -----------------------------------------------
   extractTextFromEvent(event) {
-    // Handle different event types from OpenCode
-    if (event.type === "message.delta" || event.type === "text.delta") {
-      return event.properties?.content || event.properties?.text || "";
-    }
+    // OpenCode API event types:
+    // - "message.part.updated" with properties.delta (incremental text)
+    // - "message.part.updated" with properties.part (full part data)
 
-    if (event.type === "assistant.message.delta") {
-      return event.properties?.content || "";
-    }
-
-    // Handle part-based events
-    if (event.properties?.part) {
-      const part = event.properties.part;
-      if (part.type === "text") {
-        return part.content || part.text || "";
+    if (event.type === "message.part.updated") {
+      // Delta contains the incremental text chunk
+      if (event.properties?.delta) {
+        return event.properties.delta;
       }
-    }
-
-    // Generic content extraction
-    if (event.properties?.content && typeof event.properties.content === "string") {
-      return event.properties.content;
     }
 
     return "";
