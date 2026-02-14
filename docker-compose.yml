@@ -1,8 +1,7 @@
-version: "3.8"
-
 services:
   # =============================================
   # OpenCode Server — AI coding agent with skills
+  # Includes built-in Web UI at http://localhost:4096
   # =============================================
   opencode-server:
     build:
@@ -17,49 +16,23 @@ services:
       - OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD:-}
     volumes:
       # Mount your local OpenCode auth config (after running `opencode auth login` locally)
-      # Linux/Mac:
-      #   - ${HOME}/.config/opencode:/root/.config/opencode:ro
-      # Windows:
-      - ${OPENCODE_AUTH_PATH:-C:\Users\Harry\.config\opencode}:/root/.config/opencode:ro
-      # Persistent workspace volume (shared with chatbot-ui for file upload/download)
-      - workspace-data:/workspace/uploads
-      - workspace-outputs:/workspace/outputs
+      # Set OPENCODE_AUTH_PATH in .env to your local auth config path:
+      #   Linux/Mac: ~/.config/opencode
+      #   Windows:   C:\Users\YourName\.config\opencode
+      - ${OPENCODE_AUTH_PATH:?Set OPENCODE_AUTH_PATH in .env to your opencode config path}:/root/.config/opencode:ro
+      # Persistent workspace volume for file processing
+      - workspace-data:/workspace/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4096/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:4096/health"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 30s
 
-  # =============================================
-  # Chatbot UI — multi-user web interface
-  # =============================================
-  chatbot-ui:
-    build:
-      context: ./chatbot-ui
-      dockerfile: Dockerfile
-    container_name: opencode-chatbot-ui
-    ports:
-      - "${CHATBOT_PORT:-3000}:3000"
-    environment:
-      - OPENCODE_SERVER_URL=http://opencode-server:4096
-      - PORT=3000
-      - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-50}
-    volumes:
-      # Same workspace volumes for file upload/download
-      - workspace-data:/workspace/uploads
-      - workspace-outputs:/workspace/outputs
-    depends_on:
-      opencode-server:
-        condition: service_healthy
-    restart: unless-stopped
-
 volumes:
   workspace-data:
-    name: opencode-workspace-uploads
-  workspace-outputs:
-    name: opencode-workspace-outputs
+    name: opencode-workspace-data
 
 networks:
   default:

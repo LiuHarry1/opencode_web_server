@@ -1,218 +1,156 @@
-# OpenCode Server + Chatbot UI
+# OpenCode Cloud Server
 
-A Dockerized OpenCode Server with GitHub Copilot authentication and a custom Chatbot UI built with the OpenCode SDK.
+把 OpenCode 运行在云端，预装 Agent Skills（PDF、Excel、MCP 等），通过 OpenCode 自带的 Web UI 供多人访问。
 
 ## Architecture
 
 ```
-┌─────────────────────┐         ┌──────────────────────┐
-│                     │  HTTP   │                      │
-│   Chatbot UI        │ ◄─────► │   OpenCode Server    │
-│   (Express + SDK)   │  :4096  │   (opencode web)     │
-│   Port 3000         │         │   Port 4096          │
-│                     │         │                      │
-│   @opencode-ai/sdk  │         │   GitHub Copilot     │
-│   Modern Web UI     │         │   Custom Agents      │
-└─────────────────────┘         └──────────────────────┘
-        ▲                                ▲
-        │ Browser                        │ Auth
-        │ :3000                          │ ~/.config/opencode
-        ▼                                ▼
-    ┌────────┐                    ┌──────────────┐
-    │  User  │                    │  Copilot API │
-    └────────┘                    └──────────────┘
+┌───────────────────────────────────────┐
+│         OpenCode Server               │
+│         (opencode serve)              │
+│                                       │
+│   Built-in Web UI   ◄── Browser :4096 │
+│   Agent Skills (PDF/XLSX/MCP/...)     │
+│   Python / Node.js / Shell runtime    │
+│                                       │
+│   GitHub Copilot auth (mounted)       │
+└───────────────────────────────────────┘
 ```
 
 ## Prerequisites
 
-- **Docker** & **Docker Compose** installed
+- **Docker** & **Docker Compose**
 - **GitHub Copilot** subscription (Pro, Pro+, Business, or Enterprise)
 - **OpenCode CLI** installed locally (for initial authentication)
 
 ## Quick Start
 
-### Step 1: Authenticate with GitHub Copilot
-
-First, install OpenCode CLI locally and login:
+### Step 1: Authenticate
 
 ```bash
-# Install OpenCode
 curl -fsSL https://opencode.ai/install | bash
-
-# Login with GitHub Copilot
 opencode auth login
 # Select "GitHub Copilot" and complete the device flow
 ```
 
-This stores your auth credentials at `~/.config/opencode/`.
-
-### Step 2: Configure Environment
+### Step 2: Configure
 
 ```bash
-# Copy the example env file
 cp .env.example .env
-
-# (Optional) Set a server password for security
-# Edit .env and set OPENCODE_SERVER_PASSWORD=your-secure-password
+# Edit .env:
+#   OPENCODE_AUTH_PATH=~/.config/opencode   (your auth config path)
+#   OPENCODE_SERVER_PASSWORD=your-password   (recommended)
 ```
 
-### Step 3: Build & Run
+### Step 3: Run
 
 ```bash
-# Build and start both services
-docker-compose up --build
-
-# Or run in detached mode
-docker-compose up --build -d
+docker compose up --build -d
 ```
 
-### Step 4: Open the Chatbot
+### Step 4: Open
 
-Open your browser and navigate to:
-
-- **Chatbot UI**: [http://localhost:3000](http://localhost:3000)
-- **OpenCode Server** (direct): [http://localhost:4096](http://localhost:4096)
+Open [http://localhost:4096](http://localhost:4096) — OpenCode's built-in Web UI.
 
 ## Project Structure
 
 ```
-opencode_server/
-├── docker-compose.yml          # Orchestrates both services
-├── .env                        # Environment configuration
+.
+├── docker-compose.yml            # Single-service deployment
+├── .env.example                  # Configuration template
 │
-├── server/                     # OpenCode Server
-│   ├── Dockerfile              # Server Docker image
-│   ├── opencode.json           # OpenCode configuration
-│   ├── entrypoint.sh           # Container startup script
-│   └── agents/                 # Custom Agent Skills
-│       ├── coding-assistant.md # Coding assistant agent
-│       └── code-reviewer.md    # Code review agent
-│
-└── chatbot-ui/                 # Custom Chatbot UI
-    ├── Dockerfile              # UI Docker image
-    ├── package.json            # Node.js dependencies
-    ├── server.js               # Express backend + OpenCode SDK
-    └── public/                 # Frontend assets
-        ├── index.html          # Main HTML
-        ├── styles.css          # Styles (dark/light theme)
-        └── app.js              # Frontend JavaScript
+└── server/
+    ├── Dockerfile                # Ubuntu 24.04 + Python + Node.js + OpenCode
+    ├── .dockerignore
+    ├── entrypoint.sh             # Startup: auth check, skill restore, launch
+    ├── opencode.json             # OpenCode configuration & permissions
+    ├── requirements.txt          # Python dependencies for skills
+    └── agents/skills/            # Pre-loaded Agent Skills
+        ├── pdf/                  # PDF: extract, merge, split, fill forms
+        ├── xlsx/                 # Excel: create, edit, formulas, recalc
+        ├── mcp-builder/          # MCP server development guide
+        └── skill-creator/        # Skill creation toolkit
 ```
 
-## Custom Agent Skills
+## Pre-loaded Skills
 
-Add your own agent skills by creating `.md` files in `server/agents/`:
+| Skill | Description |
+|-------|-------------|
+| **pdf** | Extract text/tables, merge/split, fill forms, convert to images |
+| **xlsx** | Create/edit spreadsheets, formulas, recalculate via LibreOffice |
+| **mcp-builder** | Guide for building MCP servers (Python/TypeScript) |
+| **skill-creator** | Create new custom skills with templates |
 
-```markdown
-# My Custom Agent
-
-You are a specialized agent for...
-
-## Instructions
-1. ...
-2. ...
-```
-
-Then register them in `server/opencode.json`:
-
-```json
-{
-  "agent": {
-    "my-custom-agent": {
-      "instructions": "./agents/my-custom-agent.md"
-    }
-  }
-}
-```
-
-Rebuild the Docker image to apply changes:
-
-```bash
-docker-compose up --build
-```
-
-## API Endpoints (Chatbot UI Backend)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/health` | Health check (checks OpenCode server) |
-| GET | `/api/agents` | List available agents |
-| POST | `/api/sessions` | Create a new chat session |
-| GET | `/api/sessions` | List all sessions |
-| GET | `/api/sessions/:id` | Get session details + messages |
-| POST | `/api/sessions/:id/prompt` | Send prompt (SSE streaming) |
+Skills 存放在 `/workspace/.opencode/skills/`，容器启动时从 `/opt/opencode-skills/` 恢复（防止 volume mount 覆盖）。
 
 ## Configuration
-
-### OpenCode Server (`server/opencode.json`)
-
-```json
-{
-  "agent": { ... },
-  "provider": {
-    "custom-provider": {
-      "npm": "@ai-sdk/openai-compatible",
-      "options": { "baseURL": "..." },
-      "models": { ... }
-    }
-  },
-  "mcp": { ... }
-}
-```
 
 ### Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENCODE_PORT` | `4096` | OpenCode server port |
-| `OPENCODE_HOST` | `0.0.0.0` | OpenCode server bind address |
-| `OPENCODE_SERVER_PASSWORD` | (empty) | Server access password |
-| `PORT` | `3000` | Chatbot UI port |
-| `OPENCODE_SERVER_URL` | `http://opencode-server:4096` | OpenCode server URL |
+| `OPENCODE_AUTH_PATH` | (required) | Local opencode auth config path |
+| `OPENCODE_PORT` | `4096` | Server port (also serves Web UI) |
+| `OPENCODE_SERVER_PASSWORD` | (empty) | Access password |
 
-## Windows Users
+### Permissions (`server/opencode.json`)
 
-On Windows, the auth config path may differ. Update `docker-compose.yml`:
+```json
+{
+  "model": "github-copilot/gpt-5.2",
+  "permission": {
+    "skill": { "*": "allow" },
+    "file": { "read": "allow", "write": "allow" },
+    "shell": "allow"
+  }
+}
+```
 
-```yaml
-volumes:
-  - C:\Users\YourName\.config\opencode:/root/.config/opencode:ro
+> **注意**: `"shell": "allow"` 允许 Agent 执行任意命令。适合受信任的环境，生产环境请酌情限制。
+
+## Security Considerations
+
+- **务必设置 `OPENCODE_SERVER_PASSWORD`**
+- 生产环境建议用 nginx/Caddy 反代并启用 HTTPS
+- `opencode.json` 中的 `shell: allow` 允许执行任意命令，多用户场景请评估风险
+- Auth 配置以只读方式挂载 (`:ro`)，Agent 无法修改
+
+## Adding Custom Skills
+
+在 `server/agents/skills/` 下创建新目录，包含 `SKILL.md`：
+
+```
+server/agents/skills/my-skill/
+├── SKILL.md          # Required: name, description, instructions
+├── scripts/          # Optional: Python/Shell scripts
+└── references/       # Optional: reference docs
+```
+
+然后重新构建：
+
+```bash
+docker compose up --build -d
 ```
 
 ## Troubleshooting
 
-### Server shows "No auth config found"
-
-Make sure you've run `opencode auth login` locally first, then check the volume mount path in `docker-compose.yml`.
-
-### Cannot connect to OpenCode server
-
-1. Check if the server is running: `docker-compose logs opencode-server`
-2. Verify the health check: `curl http://localhost:4096/health`
-3. Ensure the Docker network is created: `docker network ls`
-
-### Chatbot UI shows "Server Offline"
-
-The Chatbot UI waits for the OpenCode server to be healthy before starting. Check:
-1. `docker-compose logs opencode-server` for server errors
-2. `docker-compose logs chatbot-ui` for UI errors
-
-## Development (without Docker)
-
 ```bash
-# Terminal 1: Start OpenCode server
-opencode web --port 4096 --hostname 0.0.0.0
+# Check logs
+docker compose logs -f opencode-server
 
-# Terminal 2: Start Chatbot UI
-cd chatbot-ui
-npm install
-OPENCODE_SERVER_URL=http://localhost:4096 npm run dev
+# Verify health
+curl http://localhost:4096/health
+
+# Rebuild from scratch
+docker compose down && docker compose up --build
+```
+
+## Windows
+
+```env
+OPENCODE_AUTH_PATH=C:\Users\YourName\.config\opencode
 ```
 
 ## License
 
 MIT
-
-
-docker build -t opencode-server .
-
-docker run -d --name opencode-server -p 4096:4096 -v C:\Users\Harry\.config\opencode:/root/.config/opencode:ro -e OPENCODE_PORT=4096 -e OPENCODE_HOST=0.0.0.0 opencode-server

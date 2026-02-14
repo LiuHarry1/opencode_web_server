@@ -1,4 +1,26 @@
-node_modules/
+# Environment files
 .env
+.env.local
+
+# Logs
 *.log
-chatbot-ui/node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Docker
+docker-compose.override.yml

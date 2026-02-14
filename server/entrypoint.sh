@@ -73,13 +73,11 @@ JSONEOF
 fi
 
 # -----------------------------------------------
-# 4. Ensure workspace directories exist
+# 4. Ensure workspace data directory exists
 # -----------------------------------------------
-mkdir -p /workspace/uploads /workspace/outputs
+mkdir -p /workspace/data
 
-echo "[OK] Workspace directories ready"
-echo "    - /workspace/uploads  (file uploads)"
-echo "    - /workspace/outputs  (generated files)"
+echo "[OK] Workspace directory ready: /workspace/data"
 
 # -----------------------------------------------
 # 5. Set server password if provided
@@ -109,9 +107,9 @@ for p in pkgs:
     except ImportError:
         fail.append(p)
 if ok:
-    print(f'    Installed: {', '.join(ok)}')
+    print('    Installed: ' + ', '.join(ok))
 if fail:
-    print(f'    Missing: {', '.join(fail)}')
+    print('    Missing: ' + ', '.join(fail))
 " 2>/dev/null || echo "    [!] Python verification skipped"
 
 # -----------------------------------------------
@@ -130,7 +128,8 @@ echo "  Skills: /workspace/.opencode/skills/"
 echo "============================================"
 echo ""
 
-export PATH="$HOME/.opencode/bin:$HOME/.local/bin:$PATH"
+# Activate Python venv and ensure opencode is in PATH
+export PATH="/opt/venv/bin:$HOME/.opencode/bin:$HOME/.local/bin:$PATH"
 
 if ! command -v opencode &> /dev/null; then
     echo "[ERROR] opencode command not found in PATH"
