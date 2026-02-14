@@ -1,0 +1,20 @@
+# Test files
+test.pdf
+test.xlsx
+*.test.*
+
+# Documentation (not needed in image)
+*.md
+!agents/skills/**/*.md
+
+# Git
+.git
+.gitignore
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea

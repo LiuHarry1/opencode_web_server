@@ -6,9 +6,9 @@ LABEL description="OpenCode Server with Agent Skills (PDF, XLSX, MCP) — multi-
 ENV DEBIAN_FRONTEND=noninteractive
 
 # -----------------------------------------------
-# 1. System dependencies
+# 1. System dependencies (single RUN to reduce layers)
 # -----------------------------------------------
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     git \
@@ -22,12 +22,7 @@ RUN apt-get update && apt-get install -y \
     # Image processing support (libgl1 replaces libgl1-mesa-glx in Ubuntu 24.04+)
     libgl1 \
     libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
-
-# -----------------------------------------------
-# 2. Python 3 + pip + venv
-# -----------------------------------------------
-RUN apt-get update && apt-get install -y \
+    # Python 3
     python3 \
     python3-pip \
     python3-venv \
@@ -35,31 +30,32 @@ RUN apt-get update && apt-get install -y \
     && ln -sf /usr/bin/python3 /usr/bin/python
 
 # -----------------------------------------------
-# 3. Node.js 20 LTS
+# 2. Node.js 20 LTS
 # -----------------------------------------------
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
+    && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------------------------
-# 4. Install OpenCode CLI
+# 3. Install OpenCode CLI
 # -----------------------------------------------
 RUN curl -fsSL https://opencode.ai/install | bash
 ENV PATH="/root/.opencode/bin:${PATH}"
 RUN which opencode && opencode --version || echo "Warning: opencode not found in PATH"
 
 # -----------------------------------------------
-# 5. Install ALL Python dependencies for skills
+# 4. Python virtual environment + dependencies
 # -----------------------------------------------
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
+
 COPY requirements.txt /tmp/requirements.txt
-RUN pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt \
+RUN pip install --no-cache-dir -r /tmp/requirements.txt \
     && rm /tmp/requirements.txt
 
 # -----------------------------------------------
-# 6. Set up workspace (clean, minimal visible dirs)
+# 5. Set up workspace
 # -----------------------------------------------
-# /workspace is the main working directory — this is what users "see"
-# .opencode/ is hidden and contains skills + config
 RUN mkdir -p /workspace
 
 WORKDIR /workspace
@@ -70,30 +66,26 @@ RUN git init /workspace && \
     git config user.name "OpenCode Server"
 
 # -----------------------------------------------
-# 7. Copy OpenCode configuration
+# 6. Copy OpenCode configuration
 # -----------------------------------------------
 COPY opencode.json /workspace/opencode.json
 
 # -----------------------------------------------
-# 8. Copy Agent Skills into .opencode/skills/ (hidden from users)
+# 7. Copy Agent Skills into .opencode/skills/
 # -----------------------------------------------
 COPY agents/skills/ /workspace/.opencode/skills/
 
-# Also keep a backup in /opt for restoration after volume mounts
+# Keep a backup in /opt for restoration after volume mounts
 COPY agents/skills/ /opt/opencode-skills/
 
-# Also place skills at root level for global fallback
-RUN git init / 2>/dev/null || true
-COPY agents/skills/ /.opencode/skills/
-
 # -----------------------------------------------
-# 9. Copy entrypoint
+# 8. Copy entrypoint
 # -----------------------------------------------
 COPY entrypoint.sh /opt/entrypoint.sh
 RUN sed -i 's/\r$//' /opt/entrypoint.sh && chmod +x /opt/entrypoint.sh
 
 # -----------------------------------------------
-# 10. Create shared upload/output directories
+# 9. Create shared upload/output directories
 # -----------------------------------------------
 RUN mkdir -p /workspace/uploads /workspace/outputs
 
