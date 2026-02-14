@@ -433,7 +433,17 @@ class OpenCodeChatbot {
         breaks: true,
       });
 
-      return marked.parse(text);
+      const rawHtml = marked.parse(text);
+
+      // Sanitize to prevent XSS — allow code/pre blocks and common formatting
+      if (typeof DOMPurify !== "undefined") {
+        return DOMPurify.sanitize(rawHtml, {
+          ADD_TAGS: ["pre", "code"],
+          ADD_ATTR: ["class"],
+        });
+      }
+
+      return rawHtml;
     } catch {
       return this.escapeHtml(text).replace(/\n/g, "<br>");
     }

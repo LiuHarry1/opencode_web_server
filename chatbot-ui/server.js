@@ -1,6 +1,6 @@
 import express from "express";
 import { fileURLToPath } from "url";
-import { dirname, join, basename, extname } from "path";
+import { dirname, join, basename, extname, resolve } from "path";
 import { existsSync, mkdirSync, readdirSync, statSync, createReadStream } from "fs";
 import dotenv from "dotenv";
 import { EventSource } from "eventsource";
@@ -12,8 +12,44 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 app.use(express.static(join(__dirname, "public")));
+
+// -----------------------------------------------
+// Security: Basic rate limiting (in-memory)
+// -----------------------------------------------
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 60;      // max requests per window
+
+function rateLimit(req, res, next) {
+  const key = req.ip || req.connection.remoteAddress || "unknown";
+  const now = Date.now();
+  const entry = rateLimitMap.get(key);
+
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+    rateLimitMap.set(key, { windowStart: now, count: 1 });
+    return next();
+  }
+
+  entry.count++;
+  if (entry.count > RATE_LIMIT_MAX_REQUESTS) {
+    return res.status(429).json({ error: "Too many requests. Please try again later." });
+  }
+  return next();
+}
+
+// Clean up stale rate limit entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of rateLimitMap) {
+    if (now - entry.windowStart > RATE_LIMIT_WINDOW_MS * 2) {
+      rateLimitMap.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
+app.use(rateLimit);
 
 // -----------------------------------------------
 // Configuration
@@ -227,16 +263,29 @@ app.get("/api/files", (req, res) => {
 // -----------------------------------------------
 app.get("/api/files/:category/:filename", (req, res) => {
   const { category, filename } = req.params;
+
+  // Only allow known categories
+  if (category !== "uploads" && category !== "outputs") {
+    return res.status(400).json({ error: "Invalid file category" });
+  }
+
   const dir = category === "outputs" ? OUTPUT_DIR : UPLOAD_DIR;
-  const filePath = join(dir, decodeURIComponent(filename));
+  const decodedFilename = decodeURIComponent(filename);
+
+  // Security: reject filenames with path separators or traversal patterns
+  if (decodedFilename.includes("/") || decodedFilename.includes("\\") || decodedFilename.includes("..")) {
+    return res.status(403).json({ error: "Access denied" });
+  }
+
+  const filePath = resolve(dir, decodedFilename);
+
+  // Security: ensure resolved path is strictly within the target directory
+  if (!filePath.startsWith(resolve(dir) + "/") && filePath !== resolve(dir)) {
+    return res.status(403).json({ error: "Access denied" });
+  }
 
   if (!existsSync(filePath)) {
     return res.status(404).json({ error: "File not found" });
-  }
-
-  // Security: prevent path traversal
-  if (!filePath.startsWith(dir)) {
-    return res.status(403).json({ error: "Access denied" });
   }
 
   res.download(filePath);
@@ -324,12 +373,18 @@ app.post("/api/sessions/:id/prompt", async (req, res) => {
 
   let eventSource;
   let finished = false;
+  let safetyTimeout = null;
 
   const cleanup = () => {
     if (!finished) {
       finished = true;
+      if (safetyTimeout) {
+        clearTimeout(safetyTimeout);
+        safetyTimeout = null;
+      }
       if (eventSource) {
         try { eventSource.close(); } catch {}
+        eventSource = null;
       }
     }
   };
@@ -346,7 +401,7 @@ app.post("/api/sessions/:id/prompt", async (req, res) => {
       try {
         const data = JSON.parse(event.data);
 
-        // Only forward events for our session
+        // Only forward events for our session — drop events for other sessions
         if (data.properties?.sessionID && data.properties.sessionID !== id) {
           return;
         }
@@ -390,25 +445,25 @@ app.post("/api/sessions/:id/prompt", async (req, res) => {
       }),
     });
 
-    // Timeout safety — 5 minutes
-    const timeout = setTimeout(() => {
+    // Timeout safety — 5 minutes max per request
+    safetyTimeout = setTimeout(() => {
       if (!finished) {
         res.write(
-          `data: ${JSON.stringify({ type: "timeout", message: "Response timed out" })}\n\n`
+          `data: ${JSON.stringify({ type: "timeout", message: "Response timed out after 5 minutes" })}\n\n`
         );
         cleanup();
         res.end();
       }
     }, 5 * 60 * 1000);
-
-    req.on("close", () => clearTimeout(timeout));
   } catch (err) {
     console.error("[ERROR] Prompt failed:", err.message);
-    res.write(
-      `data: ${JSON.stringify({ type: "error", message: err.message })}\n\n`
-    );
-    cleanup();
-    res.end();
+    if (!finished) {
+      res.write(
+        `data: ${JSON.stringify({ type: "error", message: err.message })}\n\n`
+      );
+      cleanup();
+      res.end();
+    }
   }
 });
 
@@ -423,7 +478,7 @@ app.get("*", (req, res) => {
 // Start server
 // -----------------------------------------------
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, "0.0.0.0", () => {
+const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(`
 ╔══════════════════════════════════════════════════╗
 ║       OpenCode Chatbot UI (Multi-User)           ║
@@ -433,3 +488,20 @@ app.listen(PORT, "0.0.0.0", () => {
 ╚══════════════════════════════════════════════════╝
   `);
 });
+
+// Graceful shutdown
+function shutdown(signal) {
+  console.log(`\n[INFO] Received ${signal}, shutting down gracefully...`);
+  server.close(() => {
+    console.log("[INFO] Server closed.");
+    process.exit(0);
+  });
+  // Force exit after 10 seconds
+  setTimeout(() => {
+    console.error("[WARN] Forcing exit after timeout.");
+    process.exit(1);
+  }, 10_000);
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
