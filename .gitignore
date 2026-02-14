@@ -1,14 +1,9 @@
-# Dependencies
-node_modules/
-chatbot-ui/node_modules/
-
 # Environment files
 .env
 .env.local
 
 # Logs
 *.log
-npm-debug.log*
 
 # OS files
 .DS_Store

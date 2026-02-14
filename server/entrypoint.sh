@@ -73,13 +73,11 @@ JSONEOF
 fi
 
 # -----------------------------------------------
-# 4. Ensure workspace directories exist
+# 4. Ensure workspace data directory exists
 # -----------------------------------------------
-mkdir -p /workspace/uploads /workspace/outputs
+mkdir -p /workspace/data
 
-echo "[OK] Workspace directories ready"
-echo "    - /workspace/uploads  (file uploads)"
-echo "    - /workspace/outputs  (generated files)"
+echo "[OK] Workspace directory ready: /workspace/data"
 
 # -----------------------------------------------
 # 5. Set server password if provided

@@ -85,9 +85,9 @@ COPY entrypoint.sh /opt/entrypoint.sh
 RUN sed -i 's/\r$//' /opt/entrypoint.sh && chmod +x /opt/entrypoint.sh
 
 # -----------------------------------------------
-# 9. Create shared upload/output directories
+# 9. Create workspace data directory
 # -----------------------------------------------
-RUN mkdir -p /workspace/uploads /workspace/outputs
+RUN mkdir -p /workspace/data
 
 # Make initial commit so opencode has a clean state
 RUN cd /workspace && \
