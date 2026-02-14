@@ -2,7 +2,8 @@
 set -e
 
 echo "============================================"
-echo "  OpenCode Server - Starting Up"
+echo "  OpenCode Server — Starting Up"
+echo "  Multi-user Docker Deployment"
 echo "============================================"
 
 # -----------------------------------------------
@@ -11,100 +12,134 @@ echo "============================================"
 AUTH_DIR="$HOME/.config/opencode"
 
 if [ -d "$AUTH_DIR" ] && [ "$(ls -A $AUTH_DIR 2>/dev/null)" ]; then
-    echo "[✓] Found existing OpenCode auth config"
+    echo "[OK] Found existing OpenCode auth config"
 else
     echo "[!] No auth config found."
-    echo "    Please mount your local auth config:"
+    echo "    Mount your local auth config:"
     echo "    -v \$HOME/.config/opencode:/root/.config/opencode"
-    echo ""
-    echo "    Or run 'opencode auth login' interactively first."
-    echo ""
 
-    # If COPILOT_TOKEN is provided, we can try to set it up
     if [ -n "$COPILOT_TOKEN" ]; then
         echo "[*] COPILOT_TOKEN detected, attempting auto-setup..."
         mkdir -p "$AUTH_DIR"
         echo "{\"copilot_token\": \"$COPILOT_TOKEN\"}" > "$AUTH_DIR/auth.json"
-        echo "[✓] Auth config created from COPILOT_TOKEN"
+        echo "[OK] Auth config created from COPILOT_TOKEN"
     fi
 fi
 
 # -----------------------------------------------
-# 2. Check if opencode.json exists
-# -----------------------------------------------
-if [ -f "/app/opencode.json" ]; then
-    echo "[✓] Found opencode.json configuration"
-else
-    echo "[!] No opencode.json found, using defaults"
-fi
-
-# -----------------------------------------------
-# 3. Restore skills (volume mount may overwrite global config)
+# 2. Restore skills (volume mount may overwrite)
 # -----------------------------------------------
 SKILLS_BACKUP="/opt/opencode-skills"
-GLOBAL_SKILLS="$HOME/.config/opencode/skills"
+WORKSPACE_SKILLS="/workspace/.opencode/skills"
 
 if [ -d "$SKILLS_BACKUP" ] && [ "$(ls -A $SKILLS_BACKUP 2>/dev/null)" ]; then
-    # Copy skills to global config (volume mount may have overwritten them)
-    if mkdir -p "$GLOBAL_SKILLS" 2>/dev/null; then
-        cp -r "$SKILLS_BACKUP"/* "$GLOBAL_SKILLS/" 2>/dev/null || true
-        echo "[✓] Skills copied to global config"
-    else
-        echo "[i] Global config is read-only, using project-level skills only"
-    fi
+    mkdir -p "$WORKSPACE_SKILLS"
+    cp -r "$SKILLS_BACKUP"/* "$WORKSPACE_SKILLS/" 2>/dev/null || true
 
     SKILL_COUNT=$(find "$SKILLS_BACKUP" -name "SKILL.md" | wc -l)
-    echo "[✓] Found $SKILL_COUNT custom skill(s):"
+    echo "[OK] Restored $SKILL_COUNT agent skill(s):"
     for skill in "$SKILLS_BACKUP"/*/SKILL.md; do
-        name=$(basename "$(dirname "$skill")")
-        echo "    - $name"
+        if [ -f "$skill" ]; then
+            name=$(basename "$(dirname "$skill")")
+            echo "    - $name"
+        fi
     done
+
+    # Also copy to global config if writable
+    GLOBAL_SKILLS="$HOME/.config/opencode/skills"
+    if mkdir -p "$GLOBAL_SKILLS" 2>/dev/null; then
+        cp -r "$SKILLS_BACKUP"/* "$GLOBAL_SKILLS/" 2>/dev/null || true
+    fi
 else
     echo "[i] No custom skills found"
 fi
 
 # -----------------------------------------------
-# 4. Set server password if provided
+# 3. Ensure opencode.json exists in workspace
 # -----------------------------------------------
-if [ -n "$OPENCODE_SERVER_PASSWORD" ]; then
-    echo "[✓] Server password protection enabled"
-    export OPENCODE_SERVER_PASSWORD="$OPENCODE_SERVER_PASSWORD"
+if [ -f "/workspace/opencode.json" ]; then
+    echo "[OK] Found opencode.json configuration"
 else
-    echo "[!] No OPENCODE_SERVER_PASSWORD set — server is unprotected"
-    echo "    Set -e OPENCODE_SERVER_PASSWORD=yourpass for production use"
+    echo "[!] No opencode.json found, creating default"
+    cat > /workspace/opencode.json << 'JSONEOF'
+{
+  "$schema": "https://opencode.ai/schema.json",
+  "model": "github-copilot/gpt-5.2",
+  "permission": {
+    "skill": { "*": "allow" }
+  }
+}
+JSONEOF
 fi
 
 # -----------------------------------------------
-# 5. Start OpenCode Server (API mode for SDK access)
+# 4. Ensure workspace directories exist
+# -----------------------------------------------
+mkdir -p /workspace/uploads /workspace/outputs
+
+echo "[OK] Workspace directories ready"
+echo "    - /workspace/uploads  (file uploads)"
+echo "    - /workspace/outputs  (generated files)"
+
+# -----------------------------------------------
+# 5. Set server password if provided
+# -----------------------------------------------
+if [ -n "$OPENCODE_SERVER_PASSWORD" ]; then
+    echo "[OK] Server password protection enabled"
+    export OPENCODE_SERVER_PASSWORD="$OPENCODE_SERVER_PASSWORD"
+else
+    echo "[!] No OPENCODE_SERVER_PASSWORD — server is unprotected"
+fi
+
+# -----------------------------------------------
+# 6. Verify Python dependencies
+# -----------------------------------------------
+echo ""
+echo "[*] Verifying Python environment..."
+python3 -c "
+import sys
+print(f'    Python: {sys.version}')
+pkgs = ['pypdf', 'pdfplumber', 'reportlab', 'pypdfium2', 'PIL', 'pandas', 'openpyxl']
+ok = []
+fail = []
+for p in pkgs:
+    try:
+        __import__(p)
+        ok.append(p)
+    except ImportError:
+        fail.append(p)
+if ok:
+    print(f'    Installed: {', '.join(ok)}')
+if fail:
+    print(f'    Missing: {', '.join(fail)}')
+" 2>/dev/null || echo "    [!] Python verification skipped"
+
+# -----------------------------------------------
+# 7. Start OpenCode Server
 # -----------------------------------------------
 PORT="${OPENCODE_PORT:-4096}"
 HOST="${OPENCODE_HOST:-0.0.0.0}"
 
 echo ""
 echo "============================================"
-echo "  Starting OpenCode Server (API Mode)"
+echo "  OpenCode Server (API Mode)"
 echo "  Host: $HOST"
 echo "  Port: $PORT"
+echo "  Workspace: /workspace"
+echo "  Skills: /workspace/.opencode/skills/"
 echo "============================================"
 echo ""
 
-# Ensure PATH includes OpenCode bin directory
 export PATH="$HOME/.opencode/bin:$HOME/.local/bin:$PATH"
 
-# Try to find opencode
 if ! command -v opencode &> /dev/null; then
     echo "[ERROR] opencode command not found in PATH"
     echo "        PATH: $PATH"
-    echo "        Checking common locations..."
     ls -la ~/.opencode/bin/opencode 2>/dev/null || echo "  Not in ~/.opencode/bin/"
     ls -la ~/.local/bin/opencode 2>/dev/null || echo "  Not in ~/.local/bin/"
-    ls -la /usr/local/bin/opencode 2>/dev/null || echo "  Not in /usr/local/bin/"
     exit 1
 fi
 
-echo "[✓] Found opencode: $(which opencode)"
+echo "[OK] Found opencode: $(which opencode)"
 
-# Use 'opencode serve' for API server mode (for SDK access)
-# Use 'opencode web' for Web UI mode (browser interface)
-# We use 'serve' here because Chatbot UI needs API access
 exec opencode serve --hostname "$HOST" --port "$PORT"

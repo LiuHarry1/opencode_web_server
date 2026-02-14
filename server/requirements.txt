@@ -1,0 +1,22 @@
+# ============================================
+# Python Dependencies for OpenCode Agent Skills
+# ============================================
+
+# --- PDF Skill ---
+pypdf>=4.0.0
+pdfplumber>=0.11.0
+reportlab>=4.0
+pypdfium2>=4.0
+Pillow>=10.0
+pdf2image>=1.16
+
+# --- Data Processing ---
+pandas>=2.0
+openpyxl>=3.1.0
+
+# --- MCP Builder Skill ---
+anthropic>=0.39.0
+mcp>=1.1.0
+
+# --- Utilities ---
+requests>=2.31.0

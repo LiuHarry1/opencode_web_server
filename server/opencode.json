@@ -4,7 +4,12 @@
   "permission": {
     "skill": {
       "*": "allow"
-    }
+    },
+    "file": {
+      "read": "allow",
+      "write": "allow"
+    },
+    "shell": "allow"
   },
   "mcp": {},
   "theme": "catppuccin-mocha"

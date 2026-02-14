@@ -12,6 +12,9 @@ RUN npm install
 COPY server.js ./
 COPY public/ ./public/
 
+# Create workspace directories (will be overridden by volume mounts)
+RUN mkdir -p /workspace/uploads /workspace/outputs
+
 # Expose port
 EXPOSE 3000
 
