@@ -109,9 +109,9 @@ for p in pkgs:
     except ImportError:
         fail.append(p)
 if ok:
-    print(f'    Installed: {', '.join(ok)}')
+    print('    Installed: ' + ', '.join(ok))
 if fail:
-    print(f'    Missing: {', '.join(fail)}')
+    print('    Missing: ' + ', '.join(fail))
 " 2>/dev/null || echo "    [!] Python verification skipped"
 
 # -----------------------------------------------
@@ -130,7 +130,8 @@ echo "  Skills: /workspace/.opencode/skills/"
 echo "============================================"
 echo ""
 
-export PATH="$HOME/.opencode/bin:$HOME/.local/bin:$PATH"
+# Activate Python venv and ensure opencode is in PATH
+export PATH="/opt/venv/bin:$HOME/.opencode/bin:$HOME/.local/bin:$PATH"
 
 if ! command -v opencode &> /dev/null; then
     echo "[ERROR] opencode command not found in PATH"
