@@ -154,3 +154,26 @@ OPENCODE_AUTH_PATH=C:\Users\YourName\.config\opencode
 ## License
 
 MIT
+
+
+
+docker build -t opencode-server .
+
+
+docker run -d `
+  --name opencode-server `
+  -p 4096:4096 `
+  -e OPENCODE_PORT=4096 `
+  -e OPENCODE_HOST=0.0.0.0 `
+  -v "C:\Users\Harry\.config\opencode:/root/.config/opencode:ro" `
+  --restart unless-stopped `
+  opencode-server
+
+
+docker run -d `
+  --name opencode-server `
+  -p 4096:4096 `
+  -e OPENCODE_PORT=4096 `
+  -e OPENCODE_HOST=0.0.0.0 `
+  --restart unless-stopped `
+  opencode-server
