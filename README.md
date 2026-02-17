@@ -84,7 +84,7 @@ docker compose up --build -d
 
 ```bash
 # Build
-docker build -t opencode-server ./server
+docker build -t opencode-server .
 
 # Run
 docker run -d \

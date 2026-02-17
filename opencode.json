@@ -16,16 +16,15 @@
   "mcp": {
     "workspace-tools": {
       "type": "local",
-      "command": ["/opt/venv/bin/python", "/workspace/.opencode/mcp-servers/workspace-tools/server.py"],
-      "enabled": true
+      "command": ["python", ".opencode/mcp-servers/workspace-tools/server.py"],
+      "enabled": true,
+      "timeout": 30000
     },
     "filesystem": {
       "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
-      "enabled": true
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "."],
+      "enabled": true,
+      "timeout": 30000
     }
   }
-
-
-
 }

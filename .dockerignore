@@ -12,7 +12,7 @@
 .DS_Store
 Thumbs.db
 
-# Docker (don't send Dockerfile into build context)
+# Docker (don't send into build context)
 Dockerfile
 docker-compose*.yml
 
@@ -25,3 +25,10 @@ __pycache__
 *.pyc
 *.pyo
 .venv
+
+# Environment / secrets
+.env
+.env.*
+
+# Local test script
+local-test.sh

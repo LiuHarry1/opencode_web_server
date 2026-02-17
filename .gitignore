@@ -24,3 +24,7 @@ venv/
 
 # Docker
 docker-compose.override.yml
+
+# Local test artifacts
+opencode.json.bak
+.venv/

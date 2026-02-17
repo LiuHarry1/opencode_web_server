@@ -6,7 +6,7 @@ services:
   # =============================================
   opencode-server:
     build:
-      context: ./server
+      context: .
       dockerfile: Dockerfile
       args:
         BASE_IMAGE: ${BASE_IMAGE:-ubuntu:24.04}
