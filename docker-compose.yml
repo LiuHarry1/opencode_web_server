@@ -1,12 +1,15 @@
 services:
   # =============================================
   # OpenCode Server — AI coding agent with skills
-  # Includes built-in Web UI at http://localhost:4096
+  # Zero-mount deployment: auth via environment variable
+  # Built-in Web UI at http://localhost:4096
   # =============================================
   opencode-server:
     build:
       context: ./server
       dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-ubuntu:24.04}
     container_name: opencode-server
     ports:
       - "${OPENCODE_PORT:-4096}:4096"
@@ -14,14 +17,7 @@ services:
       - OPENCODE_PORT=4096
       - OPENCODE_HOST=0.0.0.0
       - OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD:-}
-    volumes:
-      # Mount your local OpenCode auth config (after running `opencode auth login` locally)
-      # Set OPENCODE_AUTH_PATH in .env to your local auth config path:
-      #   Linux/Mac: ~/.config/opencode
-      #   Windows:   C:\Users\YourName\.config\opencode
-      - ${OPENCODE_AUTH_PATH:?Set OPENCODE_AUTH_PATH in .env to your opencode config path}:/root/.config/opencode:ro
-      # Persistent workspace volume for file processing
-      - workspace-data:/workspace/data
+      - COPILOT_TOKEN=${COPILOT_TOKEN:-}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:4096/health"]
@@ -29,10 +25,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-
-volumes:
-  workspace-data:
-    name: opencode-workspace-data
 
 networks:
   default:

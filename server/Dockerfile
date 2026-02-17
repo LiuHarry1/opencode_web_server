@@ -1,7 +1,7 @@
 FROM ubuntu:24.04
 
 LABEL maintainer="opencode-server"
-LABEL description="OpenCode Server with Agent Skills (PDF, XLSX, MCP) — multi-user Docker deployment"
+LABEL description="OpenCode Server with Agent Skills (PDF, XLSX, MCP) — zero-mount multi-user deployment"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -71,21 +71,12 @@ RUN git init /workspace && \
 COPY opencode.json /workspace/opencode.json
 
 # -----------------------------------------------
-# 7. Copy Agent Skills into .opencode/skills/
+# 7. Copy Agent Skills — baked into image
 # -----------------------------------------------
 COPY agents/skills/ /workspace/.opencode/skills/
 
-# Keep a backup in /opt for restoration after volume mounts
-COPY agents/skills/ /opt/opencode-skills/
-
 # -----------------------------------------------
-# 8. Copy entrypoint
-# -----------------------------------------------
-COPY entrypoint.sh /opt/entrypoint.sh
-RUN sed -i 's/\r$//' /opt/entrypoint.sh && chmod +x /opt/entrypoint.sh
-
-# -----------------------------------------------
-# 9. Create workspace data directory
+# 8. Create workspace data directory
 # -----------------------------------------------
 RUN mkdir -p /workspace/data
 
@@ -94,6 +85,12 @@ RUN cd /workspace && \
     echo "# OpenCode Workspace" > README.md && \
     git add -A && \
     git commit -m "Initial workspace setup" --allow-empty || true
+
+# -----------------------------------------------
+# 9. Copy entrypoint
+# -----------------------------------------------
+COPY entrypoint.sh /opt/entrypoint.sh
+RUN sed -i 's/\r$//' /opt/entrypoint.sh && chmod +x /opt/entrypoint.sh
 
 EXPOSE 4096
 
