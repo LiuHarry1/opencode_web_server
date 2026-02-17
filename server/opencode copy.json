@@ -24,8 +24,20 @@
       "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
       "enabled": true
     }
+  },
+
+  "lsp": {
+    "pyright": {
+      "disabled": false,
+      "command": ["pyright-langserver", "--stdio"],
+      "extensions": [".py", ".pyi"],
+      "initialization": {
+        "python": {
+          "pythonPath": "/opt/venv/bin/python"
+        }
+      }
+    }
   }
 
-
-
+ 
 }
