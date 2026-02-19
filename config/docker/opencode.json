@@ -1,0 +1,30 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "github-copilot/gpt-5.2",
+  "permission": {
+    "skill": {
+      "*": "allow"
+    },
+    "file": {
+      "read": "allow",
+      "write": "allow"
+    },
+    "shell": "allow"
+  },
+  "theme": "catppuccin-mocha",
+
+  "mcp": {
+    "workspace-tools": {
+      "type": "local",
+      "command": ["/opt/venv/bin/python", "/workspace/.opencode/mcp-servers/workspace-tools/server.py"],
+      "enabled": true,
+      "timeout": 30000
+    },
+    "filesystem": {
+      "type": "local",
+      "command": ["mcp-server-filesystem", "/workspace"],
+      "enabled": true,
+      "timeout": 30000
+    }
+  }
+}

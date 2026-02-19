@@ -20,6 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -fsSL https://opencode.ai/install | bash
 ENV PATH="/root/.opencode/bin:${PATH}"
 
+# MCP filesystem server (pre-install so npx isn't needed at runtime)
+RUN npm install -g @modelcontextprotocol/server-filesystem
+
 # Python venv + app deps
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
@@ -29,16 +32,16 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.
 # Workspace + git + config
 WORKDIR /workspace
 RUN git init && git config user.email "opencode@server" && git config user.name "OpenCode Server"
-COPY opencode.json ./
+COPY config/docker/opencode.json ./opencode.json
 COPY .opencode/skills/ ./.opencode/skills/
 COPY .opencode/mcp-servers/ ./.opencode/mcp-servers/
 COPY .opencode/lsp/ ./.opencode/lsp/
-# COPY .opencode/plugins/ ./.opencode/plugins/
+COPY .opencode/plugins/ ./.opencode/plugins/
 COPY data/ ./data/
 RUN echo "# OpenCode Workspace" > README.md && git add -A && git commit -m "Initial workspace setup" --allow-empty || true
 
 # Entrypoint
-COPY entrypoint.sh /opt/entrypoint.sh
+COPY config/docker/entrypoint.sh /opt/entrypoint.sh
 RUN sed -i 's/\r$//' /opt/entrypoint.sh && chmod +x /opt/entrypoint.sh
 
 EXPOSE 4096

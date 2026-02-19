@@ -1,0 +1,19 @@
+
+docker build -t opencode-server .
+docker run -d --name opencode-server -p 4096:4096 opencode-server
+
+
+在 OpenCode 的对话中，直接让 Agent 调用这两个工具即可：
+测试 hello 工具 — 对 Agent 说：
+> "用 hello 工具跟'小明'打个招呼"
+Agent 会调用 hello 工具，返回类似：你好, 小明! 当前时间: 2026/2/18 15:44:00 | 工作区: /workspace
+测试 timestamp 工具 — 对 Agent 说：
+> "用 timestamp 工具告诉我现在几点"
+Agent 会返回多种时间格式的 JSON。
+测试事件和钩子 — 这些是自动触发的，在 OpenCode 服务端的日志里可以看到：
+创建新会话时会打印 [test-tools] New session created
+Agent 每次调用工具时会打印 [test-tools] Tool executing: xxx
+编辑文件时会打印 [test-tools] File edited: ...
+查看日志的方式：
+本地运行：直接看终端输出
+Docker 运行：docker compose logs -f opencode-server

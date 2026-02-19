@@ -30,5 +30,5 @@ __pycache__
 .env
 .env.*
 
-# Local test script
-local-test.sh
+# Local config (not needed in Docker build)
+config/local/

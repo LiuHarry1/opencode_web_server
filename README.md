@@ -102,20 +102,30 @@ docker run -d \
 
 ```
 .
-├── docker-compose.yml            # Single-service deployment (no volumes)
-├── .env.example                  # Configuration template
+├── Dockerfile                    # Docker 镜像构建
+├── docker-compose.yml            # Docker Compose 部署
+├── .env.example                  # 环境变量模板
+├── opencode.json                 # OpenCode 配置（本地开发用）
+├── requirements.txt              # Python 依赖
 │
-└── server/
-    ├── Dockerfile                # Ubuntu 24.04 + Python + Node.js + OpenCode
-    ├── .dockerignore
-    ├── entrypoint.sh             # Startup: auth setup, launch server
-    ├── opencode.json             # OpenCode configuration & permissions
-    ├── requirements.txt          # Python dependencies for skills
-    └── agents/skills/            # Pre-loaded Agent Skills
-        ├── pdf/                  # PDF: extract, merge, split, fill forms
-        ├── xlsx/                 # Excel: create, edit, formulas, recalc
-        ├── mcp-builder/          # MCP server development guide
-        └── skill-creator/        # Skill creation toolkit
+├── config/
+│   ├── docker/
+│   │   ├── opencode.json         # OpenCode 配置（Docker 路径）
+│   │   └── entrypoint.sh        # 容器入口脚本
+│   └── local/
+│       └── start.sh             # 本地开发启动脚本
+│
+├── data/                         # 工作区数据文件
+│
+└── .opencode/
+    ├── skills/                   # 预装 Agent Skills
+    │   ├── pdf/                  # PDF: extract, merge, split, fill forms
+    │   ├── xlsx/                 # Excel: create, edit, formulas, recalc
+    │   ├── mcp-builder/          # MCP server development guide
+    │   └── skill-creator/        # Skill creation toolkit
+    ├── mcp-servers/              # MCP 服务器
+    ├── lsp/                      # LSP 语言服务器
+    └── plugins/                  # 插件
 ```
 
 ## Pre-loaded Skills
@@ -139,7 +149,7 @@ Skills 在构建时已经内置到镜像的 `/workspace/.opencode/skills/` 目�
 | `OPENCODE_PORT` | `4096` | Server port (also serves Web UI) |
 | `OPENCODE_SERVER_PASSWORD` | (empty) | Access password (strongly recommended) |
 
-### Permissions (`server/opencode.json`)
+### Permissions (`opencode.json`)
 
 ```json
 {
@@ -168,12 +178,27 @@ Skills 在构建时已经内置到镜像的 `/workspace/.opencode/skills/` 目�
 - `opencode.json` 中的 `shell: allow` 允许执行任意命令，多用户场景请评估风险
 - `COPILOT_TOKEN` 是敏感信息，不要提交到代码仓库
 
+## Local Development
+
+无需 Docker，直接在本地运行：
+
+```bash
+# 1. 激活 Python 环境
+conda activate llm_ft
+
+# 2. 启动本地服务
+bash config/local/start.sh
+```
+
+根目录的 `opencode.json` 是本地开发配置，使用本地路径。
+Docker 容器内使用 `config/docker/opencode.json`，路径指向容器内的 `/opt/venv/bin/python` 和 `/workspace/`。
+
 ## Adding Custom Skills
 
-在 `server/agents/skills/` 下创建新目录，包含 `SKILL.md`：
+在 `.opencode/skills/` 下创建新目录，包含 `SKILL.md`：
 
 ```
-server/agents/skills/my-skill/
+.opencode/skills/my-skill/
 ├── SKILL.md          # Required: name, description, instructions
 ├── scripts/          # Optional: Python/Shell scripts
 └── references/       # Optional: reference docs
@@ -204,9 +229,9 @@ Docker Desktop → **Settings** → **Docker Engine** → 添加 mirror：
 **2. 使用替代 base image**
 
 ```bash
-docker build -f server/Dockerfile \
+docker build \
   --build-arg BASE_IMAGE=mcr.microsoft.com/devcontainers/base:ubuntu-24.04 \
-  -t opencode-server server
+  -t opencode-server .
 ```
 
 ### General
@@ -225,3 +250,7 @@ docker compose down && docker compose up --build
 ## License
 
 MIT
+
+
+docker build -t opencode-server .
+docker run -d --name opencode-server -p 4096:4096 opencode-server
