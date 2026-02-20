@@ -17,3 +17,8 @@ Agent 每次调用工具时会打印 [test-tools] Tool executing: xxx
 查看日志的方式：
 本地运行：直接看终端输出
 Docker 运行：docker compose logs -f opencode-server
+
+
+lsof -i :4096
+
+模型成功读取了 data/test_lsp_demo.py 文件，并结合 LSP 诊断信息列出了所有问题：

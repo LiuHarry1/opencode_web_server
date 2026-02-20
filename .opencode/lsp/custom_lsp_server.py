@@ -14,7 +14,7 @@ import re
 import logging
 from typing import Optional
 
-from pygls.server import LanguageServer
+from pygls.lsp.server import LanguageServer
 from lsprotocol import types
 
 # ──────────────────────────────────────────────
@@ -146,28 +146,32 @@ def _diagnose(text: str) -> list[types.Diagnostic]:
     return diagnostics
 
 
+def _publish(uri: str, diagnostics: list[types.Diagnostic]):
+    """发布诊断信息到客户端。"""
+    server.text_document_publish_diagnostics(
+        types.PublishDiagnosticsParams(uri=uri, diagnostics=diagnostics)
+    )
+
+
 @server.feature(types.TEXT_DOCUMENT_DID_OPEN)
 def did_open(params: types.DidOpenTextDocumentParams):
     """文档打开时进行诊断。"""
     doc = params.text_document
-    diagnostics = _diagnose(doc.text)
-    server.publish_diagnostics(doc.uri, diagnostics)
+    _publish(doc.uri, _diagnose(doc.text))
 
 
 @server.feature(types.TEXT_DOCUMENT_DID_CHANGE)
 def did_change(params: types.DidChangeTextDocumentParams):
     """文档内容改变时重新诊断。"""
     doc = server.workspace.get_text_document(params.text_document.uri)
-    diagnostics = _diagnose(doc.source)
-    server.publish_diagnostics(params.text_document.uri, diagnostics)
+    _publish(params.text_document.uri, _diagnose(doc.source))
 
 
 @server.feature(types.TEXT_DOCUMENT_DID_SAVE)
 def did_save(params: types.DidSaveTextDocumentParams):
     """文档保存时重新诊断。"""
     doc = server.workspace.get_text_document(params.text_document.uri)
-    diagnostics = _diagnose(doc.source)
-    server.publish_diagnostics(params.text_document.uri, diagnostics)
+    _publish(params.text_document.uri, _diagnose(doc.source))
 
 
 # ──────────────────────────────────────────────

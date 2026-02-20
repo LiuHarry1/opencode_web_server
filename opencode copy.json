@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "opencode/big-pickle",
+  "model": "github-copilot/gpt-5.2",
   "permission": {
     "skill": {
       "*": "allow"
@@ -13,17 +13,16 @@
   },
   "theme": "catppuccin-mocha",
 
-  "lsp": {
-    "custom-python-lsp": {
-      "command": ["python", ".opencode/lsp/custom_lsp_server.py"],
-      "extensions": [".py"]
-    }
-  },
-
   "mcp": {
     "workspace-tools": {
       "type": "local",
       "command": ["python", ".opencode/mcp-servers/workspace-tools/server.py"],
+      "enabled": true,
+      "timeout": 30000
+    },
+    "filesystem": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "."],
       "enabled": true,
       "timeout": 30000
     }
