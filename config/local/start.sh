@@ -14,6 +14,14 @@
 set -e
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+
+# 加载 .env（跟 docker compose 行为一致，已有的 shell 变量不会被覆盖）
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    set -a
+    source "$PROJECT_ROOT/.env"
+    set +a
+fi
+
 PYTHON_BIN="$(which python)"
 GIT_ROOT="$(cd "$PROJECT_ROOT" && git rev-parse --show-toplevel 2>/dev/null || echo "$PROJECT_ROOT")"
 
@@ -61,4 +69,4 @@ cleanup() {
 trap cleanup EXIT
 
 cd "$PROJECT_ROOT"
-opencode serve --port 4096
+opencode serve --port 4096 --print-logs --log-level WARN

@@ -13,6 +13,16 @@
   },
   "theme": "catppuccin-mocha",
 
+  "lsp": {
+    "pyright": {
+      "disabled": true
+    },
+    "custom-python-lsp": {
+      "command": ["python", ".opencode/lsp/custom_lsp_server.py"],
+      "extensions": [".py"]
+    }
+  },
+
   "mcp": {
     "workspace-tools": {
       "type": "local",

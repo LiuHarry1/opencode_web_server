@@ -8,10 +8,13 @@ Custom LSP Server — 一个用 pygls 构建的自定义 Language Server。
   4. Formatting   — 简单的空白行清理
 
 启动方式: python custom_lsp_server.py (通过 stdio 与客户端通信)
+日志输出到 stderr（不影响 stdio 通信）
 """
 
+import os
 import re
 import logging
+import time
 from typing import Optional
 
 from pygls.lsp.server import LanguageServer
@@ -21,8 +24,22 @@ from lsprotocol import types
 # Server 初始化
 # ──────────────────────────────────────────────
 
+LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lsp.log")
+
 server = LanguageServer("custom-python-lsp", "v0.1.0")
 logger = logging.getLogger("custom-python-lsp")
+_call_seq = 0
+
+
+def _log_call(method: str, detail: str = ""):
+    """统一的方法调用日志，带序号和时间戳方便追踪调用顺序。"""
+    global _call_seq
+    _call_seq += 1
+    ts = time.strftime("%H:%M:%S")
+    msg = f"[#{_call_seq} {ts}] ← {method}"
+    if detail:
+        msg += f"  |  {detail}"
+    logger.info(msg)
 
 # ──────────────────────────────────────────────
 # 1. Diagnostics — 文档打开 / 修改时自动检测问题
@@ -148,30 +165,63 @@ def _diagnose(text: str) -> list[types.Diagnostic]:
 
 def _publish(uri: str, diagnostics: list[types.Diagnostic]):
     """发布诊断信息到客户端。"""
+    _log_call("publishDiagnostics →", f"uri={uri}  count={len(diagnostics)}")
     server.text_document_publish_diagnostics(
         types.PublishDiagnosticsParams(uri=uri, diagnostics=diagnostics)
     )
 
 
+# ──────────────────────────────────────────────
+# 0. Lifecycle — 生命周期事件
+# （注意: pygls 2.x 内部管理 initialize/shutdown，
+#   这里只 hook initialized 通知，不影响内部流程）
+# ──────────────────────────────────────────────
+
+@server.feature(types.INITIALIZED)
+def on_initialized(params: types.InitializedParams):
+    """客户端确认初始化完成，LSP 进入工作状态。"""
+    _log_call("initialized", "server ready — 开始接收文档事件")
+
+
+# ──────────────────────────────────────────────
+# 1. Document Sync — 文档同步事件
+# ──────────────────────────────────────────────
+
 @server.feature(types.TEXT_DOCUMENT_DID_OPEN)
 def did_open(params: types.DidOpenTextDocumentParams):
     """文档打开时进行诊断。"""
     doc = params.text_document
-    _publish(doc.uri, _diagnose(doc.text))
+    lines = doc.text.count("\n") + 1
+    _log_call("textDocument/didOpen", f"uri={doc.uri}  lang={doc.language_id}  version={doc.version}  lines={lines}")
+    diags = _diagnose(doc.text)
+    _publish(doc.uri, diags)
 
 
 @server.feature(types.TEXT_DOCUMENT_DID_CHANGE)
 def did_change(params: types.DidChangeTextDocumentParams):
     """文档内容改变时重新诊断。"""
-    doc = server.workspace.get_text_document(params.text_document.uri)
-    _publish(params.text_document.uri, _diagnose(doc.source))
+    uri = params.text_document.uri
+    ver = params.text_document.version
+    changes = len(params.content_changes) if params.content_changes else 0
+    _log_call("textDocument/didChange", f"uri={uri}  version={ver}  changes={changes}")
+    doc = server.workspace.get_text_document(uri)
+    _publish(uri, _diagnose(doc.source))
 
 
 @server.feature(types.TEXT_DOCUMENT_DID_SAVE)
 def did_save(params: types.DidSaveTextDocumentParams):
     """文档保存时重新诊断。"""
-    doc = server.workspace.get_text_document(params.text_document.uri)
-    _publish(params.text_document.uri, _diagnose(doc.source))
+    uri = params.text_document.uri
+    _log_call("textDocument/didSave", f"uri={uri}")
+    doc = server.workspace.get_text_document(uri)
+    _publish(uri, _diagnose(doc.source))
+
+
+@server.feature(types.TEXT_DOCUMENT_DID_CLOSE)
+def did_close(params: types.DidCloseTextDocumentParams):
+    """文档关闭。"""
+    uri = params.text_document.uri
+    _log_call("textDocument/didClose", f"uri={uri}")
 
 
 # ──────────────────────────────────────────────
@@ -184,13 +234,16 @@ def did_save(params: types.DidSaveTextDocumentParams):
 )
 def completions(params: types.CompletionParams) -> types.CompletionList:
     """提供代码补全建议。"""
-    doc = server.workspace.get_text_document(params.text_document.uri)
-    line = doc.source.splitlines()[params.position.line] if doc.source.splitlines() else ""
-    current_word = _get_word_at(line, params.position.character)
+    uri = params.text_document.uri
+    pos = params.position
+    _log_call("textDocument/completion", f"uri={uri}  line={pos.line}  char={pos.character}")
+
+    doc = server.workspace.get_text_document(uri)
+    line = doc.source.splitlines()[pos.line] if doc.source.splitlines() else ""
+    current_word = _get_word_at(line, pos.character)
 
     items = []
 
-    # 代码片段补全
     for label, snippet, doc_str in COMPLETION_SNIPPETS:
         if current_word and not label.startswith(current_word):
             continue
@@ -202,7 +255,6 @@ def completions(params: types.CompletionParams) -> types.CompletionList:
             insert_text_format=types.InsertTextFormat.Snippet,
         ))
 
-    # 内置函数补全
     for name, doc_str in BUILTIN_DOCS.items():
         if current_word and not name.startswith(current_word):
             continue
@@ -216,6 +268,7 @@ def completions(params: types.CompletionParams) -> types.CompletionList:
             ),
         ))
 
+    _log_call("textDocument/completion →", f"返回 {len(items)} 个补全项  word={current_word!r}")
     return types.CompletionList(is_incomplete=False, items=items)
 
 
@@ -235,18 +288,25 @@ def _get_word_at(line: str, character: int) -> str:
 @server.feature(types.TEXT_DOCUMENT_HOVER)
 def hover(params: types.HoverParams) -> Optional[types.Hover]:
     """鼠标悬浮时显示文档提示。"""
-    doc = server.workspace.get_text_document(params.text_document.uri)
+    uri = params.text_document.uri
+    pos = params.position
+    _log_call("textDocument/hover", f"uri={uri}  line={pos.line}  char={pos.character}")
+
+    doc = server.workspace.get_text_document(uri)
     lines = doc.source.splitlines()
-    if params.position.line >= len(lines):
+    if pos.line >= len(lines):
+        _log_call("textDocument/hover →", "line out of range, return None")
         return None
 
-    line = lines[params.position.line]
-    word = _get_word_at_position(line, params.position.character)
+    line = lines[pos.line]
+    word = _get_word_at_position(line, pos.character)
 
     if not word:
+        _log_call("textDocument/hover →", "no word at position, return None")
         return None
 
-    # 查找内置函数文档
+    _log_call("textDocument/hover →", f"word={word!r}")
+
     if word in BUILTIN_DOCS:
         return types.Hover(
             contents=types.MarkupContent(
@@ -301,6 +361,12 @@ def _get_word_at_position(line: str, character: int) -> str:
 # ──────────────────────────────────────────────
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    logger.info("Custom Python LSP Server starting...")
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s [%(name)s] %(message)s",
+        datefmt="%H:%M:%S",
+        filename=LOG_FILE,
+        filemode="w",
+    )
+    logger.info("Custom Python LSP Server starting (pid=%d)  log → %s", os.getpid(), LOG_FILE)
     server.start_io()
