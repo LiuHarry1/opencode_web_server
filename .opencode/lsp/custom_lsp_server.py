@@ -7,10 +7,12 @@ Custom LSP Server — 一个用 pygls 构建的自定义 Language Server。
   3. Hover        — 悬浮提示，显示常用内置函数的文档
   4. Formatting   — 简单的空白行清理
 
-启动方式: python custom_lsp_server.py (通过 stdio 与客户端通信)
-日志输出到 stderr（不影响 stdio 通信）
+启动方式:
+  - stdio: python custom_lsp_server.py （默认，编辑器会启动进程）
+  - tcp:   python custom_lsp_server.py --tcp [port]  （手动启动，编辑器远程连接）
 """
 
+import argparse
 import os
 import re
 import logging
@@ -361,12 +363,40 @@ def _get_word_at_position(line: str, character: int) -> str:
 # ──────────────────────────────────────────────
 
 if __name__ == "__main__":
+    import sys
+
+    parser = argparse.ArgumentParser(description="Custom Python LSP Server")
+    parser.add_argument(
+        "--tcp",
+        type=int,
+        nargs="?",
+        const=6008,
+        default=None,
+        metavar="PORT",
+        help="TCP 模式：监听端口，等待客户端连接（默认 6008）",
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="127.0.0.1",
+        help="TCP 模式下的监听地址（默认 127.0.0.1，远程可设 0.0.0.0）",
+    )
+    args = parser.parse_args()
+
+    handlers = [
+        logging.FileHandler(LOG_FILE, mode="w", encoding="utf-8"),
+        logging.StreamHandler(sys.stderr),
+    ]
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format="%(asctime)s [%(name)s] %(message)s",
         datefmt="%H:%M:%S",
-        filename=LOG_FILE,
-        filemode="w",
+        handlers=handlers,
     )
     logger.info("Custom Python LSP Server starting (pid=%d)  log → %s", os.getpid(), LOG_FILE)
-    server.start_io()
+
+    if args.tcp is not None:
+        logger.info("TCP mode: listening on %s:%d", args.host, args.tcp)
+        server.start_tcp(args.host, args.tcp)
+    else:
+        server.start_io()

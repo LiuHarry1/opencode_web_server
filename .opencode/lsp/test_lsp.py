@@ -37,7 +37,7 @@ def make_request(method: str, params: dict | None = None) -> dict:
 
 def make_notification(method: str, params: dict | None = None) -> dict:
     return {"jsonrpc": "2.0", "method": method, "params": params or {}}
-
+ 
 
 # ── Reader thread ─────────────────────────────
 

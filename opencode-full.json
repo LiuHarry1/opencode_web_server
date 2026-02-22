@@ -20,6 +20,14 @@
     "custom-python-lsp": {
       "command": ["python", ".opencode/lsp/custom_lsp_server.py"],
       "extensions": [".py"]
+    },
+    "lsp-tcp-bridge": {
+      "command": ["python", ".opencode/lsp/lsp_tcp_bridge.py"],
+      "extensions": [".py"],
+      "env": {
+        "LSP_TCP_HOST": "localhost",
+        "LSP_TCP_PORT": "6008"
+      }
     }
   },
 
